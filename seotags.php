@@ -1,12 +1,45 @@
 <?php
-/* Version: 0.0.1
+/** 
+ * Version: 0.0.2
  * Processes html and possibly replaces <title/> tag, <meta name="keywords"/> and <meta name="description"/> tags
  */
+
+class SeoTagsInternalTagsDb {
+    protected $_data = array();
+
+    function loadTagsForCurrentPage()
+    {
+        $page = $_SERVER['REQUEST_URI'];
+        $filename = dirname(__FILE__) . '/tagscache/' . md5($_SERVER['REQUEST_URI']);
+
+        if(file_exists($filename)){
+            $this->_data = unserialize(file_get_contents($filename));
+        }
+    }
+
+    function getFieldData($key)
+    {
+        return isset($this->_data[$key]) ? $this->_data[$key] : null;
+    }
+}
 
 class SeoTagsProcessor {
     /* True after first processing, false before */
     public static $processedAlready = false;
     public static $serviceUrlEndpoint = 'http://me/request-receiver.php';
+    public static $serviceIncludedHtml = '<script type="text/javascript" src="http://me/service-javascript.js"></script>';
+    public $tagsDb;
+
+    function __construct()
+    {
+        $this->tagsDb = new SeoTagsInternalTagsDb;
+
+        try{
+            $this->tagsDb->loadTagsForCurrentPage();
+        }catch(Exception $e){
+            $this->sendError('error-loading-tags-database');
+        }
+    }
 
     /*
      * Returns array with 2 elements - position of $needle in $html and the rest substring after string searched
@@ -19,7 +52,7 @@ class SeoTagsProcessor {
             return array($pos, substr($html, $pos + strlen($needle)));
         }
 
-        return false;
+        return array(false, false);
     }
 
     /*
@@ -78,25 +111,63 @@ class SeoTagsProcessor {
 
         // Replacing title
         if($titleHtml){
-            $headHtml = str_replace($titleHtml, '<title>!!!</title>', $headHtml);
+            if($this->tagsDb->getFieldData('title')){
+                $headHtml = str_replace($titleHtml, '<title>' . $this->tagsDb->getFieldData('title') . '</title>', $headHtml);
+            }
+
+            // If server gives us title which is different from old version then tell server about it
+            // This works for most cases but not all
+            if($this->tagsDb->getFieldData('titleBefore')){
+                list($pos, $dummy) = $this->ownStrpos($this->tagsDb->getFieldData('titleBefore'), $titleHtml);
+                if(!$pos){
+                    $this->sendError('server-title-changed');
+                }
+            }
         }else{
             $this->sendError('title-not-found');
         }
 
         // Replacing description
         if(isset($metaTagsHtml['description'])){
-            $headHtml = str_replace($metaTagsHtml['description'], '<meta name="description" content="!!!"/>', $headHtml);
+            if($this->tagsDb->getFieldData('description')){
+                $headHtml = str_replace($metaTagsHtml['description'], 
+                    '<meta name="description" content="' . htmlspecialchars($this->tagsDb->getFieldData('description')) . '"/>', 
+                    $headHtml 
+                );
+            }
+
+            // If server gives us description which is different from old version then tell server about it
+            // This works for most cases but not all
+            if($this->tagsDb->getFieldData('descriptionBefore')){
+                list($pos, $dummy) = $this->ownStrpos($this->tagsDb->getFieldData('descriptionBefore'), $titleHtml);
+                if(!$pos){
+                    $this->sendError('server-description-changed');
+                }
+            }
         }else{
-            $this->sendError('keywords-not-found');
+            $this->sendError('description-not-found');
         }
 
         // Replacing keywords
         if(isset($metaTagsHtml['keywords'])){
-            $headHtml = str_replace($metaTagsHtml['keywords'], '<meta name="keywords" content="!!!"/>', $headHtml);
+            if($this->tagsDb->getFieldData('keywords')){
+                $headHtml = str_replace($metaTagsHtml['keywords'], 
+                    '<meta name="keywords" content="' . htmlspecialchars($this->tagsDb->getFieldData('keywords')) . '"/>', 
+                    $headHtml 
+                );
+            }
+
+            // If server gives us title which is different from old version then tell server about it
+            // This works for most cases but not all
+            if($this->tagsDb->getFieldData('keywordsBefore')){
+                list($pos, $dummy) = $this->ownStrpos($this->tagsDb->getFieldData('keywordsBefore'), $titleHtml);
+                if(!$pos){
+                    $this->sendError('server-keywords-changed');
+                }
+            }
         }else{
-            $this->sendError('description-not-found');
+            $this->sendError('keywords-not-found');
         }
-        $this->sendError('test-error');
 
         return $headHtml . $htmlRest;
     }
