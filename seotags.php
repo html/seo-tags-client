@@ -1,6 +1,6 @@
 <?php
 /** 
- * Version: 0.0.2
+ * Version: 0.0.3
  * Processes html and possibly replaces <title/> tag, <meta name="keywords"/> and <meta name="description"/> tags
  */
 
@@ -26,7 +26,7 @@ class SeoTagsInternalTagsDb {
 class SeoTagsProcessor {
     /* True after first processing, false before */
     public static $processedAlready = false;
-    public static $serviceUrlEndpoint = 'http://me/request-receiver.php';
+    public static $serviceUrlEndpoint = 'http://me:5555/process-notification';
     public static $serviceIncludedHtml = '<script type="text/javascript" src="http://me/service-javascript.js"></script>';
     public $tagsDb;
 
@@ -178,11 +178,11 @@ class SeoTagsProcessor {
     }
 
     function process($html){
-        if(self::$processedAlready){
+        if(SeoTagsProcessor::$processedAlready){
             return $html;
         }
 
-        self::$processedAlready = true;
+        SeoTagsProcessor::$processedAlready = true;
         return $this->replaceSeoTags($html);
     }
 
@@ -220,12 +220,15 @@ class SeoTagsProcessor {
     function sendError($errorType)
     {
         try{
+
             $this->curl_request_async(self::$serviceUrlEndpoint, array(
                 'error-code' => $errorType,
+                'scheme' => $_SERVER['REQUEST_SCHEME'],
                 'host' => $_SERVER['HTTP_HOST'],
                 'port' => $_SERVER['SERVER_PORT'],
                 'page-url' => $_SERVER['REQUEST_URI']
             ));
+
         }catch(Exception $e){
             // Just ignore it
         }

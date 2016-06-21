@@ -5,6 +5,7 @@ seotags.php
 --------------
 Processes html. 
 
+Works only once per page request.
 Tries to search <title> tag, <meta name="description"/> tag, <meta name="keywords"/> tag.
 If no such tags found, error is sent to server (title-not-found, description-not-found, keywords-not-found).
 
