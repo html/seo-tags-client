@@ -1,0 +1,27 @@
+This software part is responsible for
+searching and replacing site meta tags on the fly.
+
+seotags.php
+--------------
+Processes html. 
+
+Tries to search <title> tag, <meta name="description"/> tag, <meta name="keywords"/> tag.
+If no such tags found, error is sent to server (title-not-found, description-not-found, keywords-not-found).
+
+Tries to find cache replacement for current page for title, description and keywords.
+If replacement is found then outputs it.
+
+Server tags values are stored also. If data is updated from client app (not seo editor).
+There are 3 different tags values - current tags from server, tags from server that were last processed from seo editor, tags from cache that were last saved via seo editor. 
+If current tags from server are different from the last processed tags, error is sent to seo editor (server-title-changed, server-description-changed, server-keywords-changed).
+
+Other errors that could be returned are:
+error-loading-tags-database is sent when error occured during tags cache loading on current page.
+
+tagsupdater.php
+---------------
+Used to save tags from server.
+
+tests.php
+---------------
+Used different testings from seo-editor
