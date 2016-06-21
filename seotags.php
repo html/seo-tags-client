@@ -36,6 +36,11 @@ class SeoTagsProcessor {
 
         try{
             $this->tagsDb->loadTagsForCurrentPage();
+
+            if(!$this->tagsDb->getFieldData('title')){
+                $this->sendError('no-data-for-page');
+            }
+
         }catch(Exception $e){
             $this->sendError('error-loading-tags-database');
         }

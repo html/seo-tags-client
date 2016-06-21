@@ -17,6 +17,7 @@ If current tags from server are different from the last processed tags, error is
 
 Other errors that could be returned are:
 error-loading-tags-database is sent when error occured during tags cache loading on current page.
+no-data-for-page is sent when no cached data is available.
 
 tagsupdater.php
 ---------------
