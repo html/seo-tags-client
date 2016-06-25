@@ -1,6 +1,6 @@
 <?php
 /** 
- * Version: 0.0.3
+ * Version: 0.0.5
  * Processes html and possibly replaces <title/> tag, <meta name="keywords"/> and <meta name="description"/> tags
  */
 
@@ -29,20 +29,22 @@ class SeoTagsProcessor {
     public static $serviceUrlEndpoint = 'http://me:5555/process-notification';
     public static $serviceIncludedHtml = '<script type="text/javascript" src="http://me/service-javascript.js"></script>';
     public $tagsDb;
+    public $requestId;
 
     function __construct()
     {
         $this->tagsDb = new SeoTagsInternalTagsDb;
+        $this->requestId = md5(time() . $_SERVER['REQUEST_URI'] . rand());
 
         try{
             $this->tagsDb->loadTagsForCurrentPage();
 
             if(!$this->tagsDb->getFieldData('title')){
-                $this->sendError('no-data-for-page');
+                $this->sendNotification('no-data-for-page');
             }
 
         }catch(Exception $e){
-            $this->sendError('error-loading-tags-database');
+            $this->sendNotification('error-loading-tags-database');
         }
     }
 
@@ -113,23 +115,41 @@ class SeoTagsProcessor {
 
         $titleHtml = $this->getTitleTagHtml($headHtml);
         $metaTagsHtml = $this->getDescriptionAndKeywordsHtml($headHtml);
+        $htmlToBeInjected = self::$serviceIncludedHtml;
 
         // Replacing title
         if($titleHtml){
             if($this->tagsDb->getFieldData('title')){
-                $headHtml = str_replace($titleHtml, '<title>' . $this->tagsDb->getFieldData('title') . '</title>', $headHtml);
+                $headHtml = str_replace($titleHtml, '<title>' . htmlspecialchars($this->tagsDb->getFieldData('title')) . '</title>', $headHtml);
             }
 
             // If server gives us title which is different from old version then tell server about it
             // This works for most cases but not all
             if($this->tagsDb->getFieldData('titleBefore')){
-                list($pos, $dummy) = $this->ownStrpos($this->tagsDb->getFieldData('titleBefore'), $titleHtml);
-                if(!$pos){
-                    $this->sendError('server-title-changed');
+                if($this->tagsDb->getFieldData('titleBefore') == '<empty>'){
+                    // TODO: Skipping this case for now, useless in most cases
+                    // it is actual when server didn' have title tag and than title tag appeared
+
+                // Server had title tag and contents of it changed
+                }else{
+                    list($pos, $dummy) = $this->ownStrpos($this->tagsDb->getFieldData('titleBefore'), $titleHtml);
+                    if(!$pos){
+                        $this->sendNotification('server-title-changed');
+                    }
                 }
             }
+
+        // There is no title on page but there is title from seo-editor 
         }else{
-            $this->sendError('title-not-found');
+
+            // Page already processed by seo-editor
+            if($this->tagsDb->getFieldData('titleBefore') == '<empty>'){
+                $htmlToBeInjected .= '<title>' . htmlspecialchars($this->tagsDb->getFieldData('title')) . '</title>';
+
+            // Need to process page in seo-editor
+            }else{
+                $this->sendNotification('title-not-found');
+            }
         }
 
         // Replacing description
@@ -144,13 +164,29 @@ class SeoTagsProcessor {
             // If server gives us description which is different from old version then tell server about it
             // This works for most cases but not all
             if($this->tagsDb->getFieldData('descriptionBefore')){
-                list($pos, $dummy) = $this->ownStrpos($this->tagsDb->getFieldData('descriptionBefore'), $titleHtml);
-                if(!$pos){
-                    $this->sendError('server-description-changed');
+                if($this->tagsDb->getFieldData('descriptionBefore') == '<empty>'){
+                    // TODO: Skipping this case for now, useless in most cases
+                    // it is actual when server didn' have description tag and than description tag appeared
+
+                // Server had description tag and contents of it changed
+                }else{
+                    list($pos, $dummy) = $this->ownStrpos($this->tagsDb->getFieldData('descriptionBefore'), $metaTagsHtml['description']);
+                    if(!$pos){
+                        $this->sendNotification('server-description-changed');
+                    }
                 }
             }
+        // There is no description on page but there is description from seo-editor 
         }else{
-            $this->sendError('description-not-found');
+
+            // Page already processed by seo-editor
+            if($this->tagsDb->getFieldData('descriptionBefore') == '<empty>'){
+                $htmlToBeInjected .= '<meta name="description" content="' . htmlspecialchars($this->tagsDb->getFieldData('description')) . '"/>' . "\n";
+
+            // Need to process page in seo-editor
+            }else{
+                $this->sendNotification('description-not-found');
+            }
         }
 
         // Replacing keywords
@@ -165,13 +201,40 @@ class SeoTagsProcessor {
             // If server gives us title which is different from old version then tell server about it
             // This works for most cases but not all
             if($this->tagsDb->getFieldData('keywordsBefore')){
-                list($pos, $dummy) = $this->ownStrpos($this->tagsDb->getFieldData('keywordsBefore'), $titleHtml);
-                if(!$pos){
-                    $this->sendError('server-keywords-changed');
+                if($this->tagsDb->getFieldData('keywordsBefore') == '<empty>'){
+                    // TODO: Skipping this case for now, useless in most cases
+                    // it is actual when server didn' have keywords tag and than keywords tag appeared
+
+                // Server had keywords tag and contents of it changed
+                }else{
+                    list($pos, $dummy) = $this->ownStrpos($this->tagsDb->getFieldData('keywordsBefore'), $metaTagsHtml['keywords']);
+                    if(!$pos){
+                        $this->sendNotification('server-keywords-changed');
+                    }
                 }
             }
+        // There is no keywords on page but there are keywords from seo-editor 
         }else{
-            $this->sendError('keywords-not-found');
+
+            // Page already processed by seo-editor
+            if($this->tagsDb->getFieldData('keywordsBefore') == '<empty>'){
+                $htmlToBeInjected .= '<meta name="keywords" content="' . htmlspecialchars($this->tagsDb->getFieldData('keywords')) . '"/>' . "\n";
+
+            // Need to process page in seo-editor
+            }else{
+                $this->sendNotification('keywords-not-found');
+            }
+        }
+
+        if($htmlToBeInjected){
+            // Trying to prepend our html before any of popular head tags
+            foreach(array( '<link','<meta', '<base', '<style', '<script') as $tag){
+                list($pos, $rest) = $this->ownStrpos($headHtml, $tag);
+                if($pos){
+                    $headHtml = substr($headHtml, 0, $pos) . $htmlToBeInjected . $tag . $rest;
+                    break;
+                }
+            }
         }
 
         return $headHtml . $htmlRest;
@@ -217,17 +280,18 @@ class SeoTagsProcessor {
         fclose($fp);
     }
 
-    function sendError($errorType)
+    function sendNotification($errorType, $params = array())
     {
         try{
 
-            $this->curl_request_async(self::$serviceUrlEndpoint, array(
+            $this->curl_request_async(self::$serviceUrlEndpoint, array_merge($params, array(
                 'error-code' => $errorType,
                 'scheme' => $_SERVER['REQUEST_SCHEME'],
                 'host' => $_SERVER['HTTP_HOST'],
                 'port' => $_SERVER['SERVER_PORT'],
-                'page-url' => $_SERVER['REQUEST_URI']
-            ));
+                'page-url' => $_SERVER['REQUEST_URI'],
+                'request-id' => $this->requestId
+            )));
 
         }catch(Exception $e){
             // Just ignore it
@@ -243,15 +307,23 @@ function replaceSeoTagsOb($html){
         return false;
     }
 
+    if(SeoTagsProcessor::$processedAlready){
+        return false;
+    }
+
+    $start = microtime(true);
     $processor = new SeoTagsProcessor();
-    return $processor->process($html);
+    $return = $processor->process($html);
+    $timeWorked = microtime(true) - $start;
+    $processor->sendNotification('processing-finished', array('profiling-time' => $timeWorked));
+
+    return $return;
 }
 
 /*
  * This is function version for using without ob_start
  */
 function replaceSeoTags($html){
-    $start = microtime(true);
     $result = replaceSeoTagsOb((string)$html);
 
     if(!$result){

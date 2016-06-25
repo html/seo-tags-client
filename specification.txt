@@ -6,23 +6,26 @@ seotags.php
 Processes html. 
 
 Works only once per page request.
+Adds script tag to head for different client stuff from seo-editor.
 Tries to search <title> tag, <meta name="description"/> tag, <meta name="keywords"/> tag.
-If no such tags found, error is sent to server (title-not-found, description-not-found, keywords-not-found).
+If no such tags found, error is sent to seo-editor (title-not-found, description-not-found, keywords-not-found).
+In this case seo-editor saves tags information to site as '<empty>'
 
 Tries to find cache replacement for current page for title, description and keywords.
 If replacement is found then outputs it.
 
-Server tags values are stored also. If data is updated from client app (not seo editor).
-There are 3 different tags values - current tags from server, tags from server that were last processed from seo editor, tags from cache that were last saved via seo editor. 
-If current tags from server are different from the last processed tags, error is sent to seo editor (server-title-changed, server-description-changed, server-keywords-changed).
+Server tags values are stored also. It acts if data is updated from client app (not seo editor).
+There are 3 different tags values - current tags from server (from processed html), tags from server that were last processed from seo editor, tags from cache that were last saved via seo editor. 
+If current tags from server are different from the last processed tags from server, error is sent to seo editor (server-title-changed, server-description-changed, server-keywords-changed).
 
 Other errors that could be returned are:
 error-loading-tags-database is sent when error occured during tags cache loading on current page.
 no-data-for-page is sent when no cached data is available.
+processing-finished is sent when processing is finished. Sends processing time information to server.
 
 tagsupdater.php
 ---------------
-Used to save tags from server.
+Used to save tags from seo-editor to internal database. Returns 'OK' in response if saved properly.
 
 tests.php
 ---------------
