@@ -1,6 +1,6 @@
 <?php
 /** 
- * Version: 0.0.5
+ * Version: 0.0.6
  * Processes html and possibly replaces <title/> tag, <meta name="keywords"/> and <meta name="description"/> tags
  */
 
@@ -132,7 +132,7 @@ class SeoTagsProcessor {
 
                 // Server had title tag and contents of it changed
                 }else{
-                    list($pos, $dummy) = $this->ownStrpos($this->tagsDb->getFieldData('titleBefore'), $titleHtml);
+                    list($pos, $dummy) = $this->ownStrpos($titleHtml, $this->tagsDb->getFieldData('titleBefore'));
                     if(!$pos){
                         $this->sendNotification('server-title-changed');
                     }
@@ -170,7 +170,7 @@ class SeoTagsProcessor {
 
                 // Server had description tag and contents of it changed
                 }else{
-                    list($pos, $dummy) = $this->ownStrpos($this->tagsDb->getFieldData('descriptionBefore'), $metaTagsHtml['description']);
+                    list($pos, $dummy) = $this->ownStrpos($metaTagsHtml['description'], $this->tagsDb->getFieldData('descriptionBefore'));
                     if(!$pos){
                         $this->sendNotification('server-description-changed');
                     }
@@ -207,7 +207,7 @@ class SeoTagsProcessor {
 
                 // Server had keywords tag and contents of it changed
                 }else{
-                    list($pos, $dummy) = $this->ownStrpos($this->tagsDb->getFieldData('keywordsBefore'), $metaTagsHtml['keywords']);
+                    list($pos, $dummy) = $this->ownStrpos($metaTagsHtml['keywords'], $this->tagsDb->getFieldData('keywordsBefore'));
                     if(!$pos){
                         $this->sendNotification('server-keywords-changed');
                     }
