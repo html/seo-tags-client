@@ -1,6 +1,6 @@
 <?php 
 /*
- * Version: 0.0.3
+ * Version: 0.0.4
  */
 
 function saveTags($url, $data){
@@ -20,4 +20,12 @@ if(isset($_GET['ping'])){
     $processor->sendNotification('ping', array('pingParam' => true));
 
     die('pinged');
+}
+
+if(isset($_GET['show-db-size'])){
+    ob_start();
+    $data = system('du -sh tagscache');
+    ob_end_clean();
+    list($size, $name) = explode("\t", $data);
+    echo $size;
 }
