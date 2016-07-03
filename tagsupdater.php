@@ -1,6 +1,6 @@
 <?php 
 /*
- * Version: 0.0.2
+ * Version: 0.0.3
  */
 
 function saveTags($url, $data){
@@ -11,4 +11,13 @@ function saveTags($url, $data){
 if(isset($_POST['tags']) && isset($_POST['url'])){
     saveTags($_POST['url'], $_POST['tags']);
     echo "OK";
+}
+
+if(isset($_GET['ping'])){
+    define('DISABLE_SEOTAGS_OUTPUT_BUFFERING', true);
+    require_once dirname(__FILE__) . '/seotags.php';
+    $processor = new SeoTagsProcessor();
+    $processor->sendNotification('ping', array('pingParam' => true));
+
+    die('pinged');
 }

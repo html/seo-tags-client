@@ -1,6 +1,6 @@
 <?php
 /** 
- * Version: 0.0.6
+ * Version: 0.0.7
  * Processes html and possibly replaces <title/> tag, <meta name="keywords"/> and <meta name="description"/> tags
  */
 
@@ -10,7 +10,7 @@ class SeoTagsInternalTagsDb {
     function loadTagsForCurrentPage()
     {
         $page = $_SERVER['REQUEST_URI'];
-        $filename = dirname(__FILE__) . '/tagscache/' . md5($_SERVER['REQUEST_URI']);
+        $filename = dirname(__FILE__) . '/tagscache/' . md5(SeoTagsProcessor::getRequestUri());
 
         if(file_exists($filename)){
             $this->_data = unserialize(file_get_contents($filename));
@@ -28,6 +28,7 @@ class SeoTagsProcessor {
     public static $processedAlready = false;
     public static $serviceUrlEndpoint = 'http://me:5555/process-notification';
     public static $serviceIncludedHtml = '<script type="text/javascript" src="http://me/service-javascript.js"></script>';
+    public static $socketTimeout = '0.05'; // Need small value to not protract client site requests
     public $tagsDb;
     public $requestId;
 
@@ -253,6 +254,7 @@ class SeoTagsProcessor {
     /* Taken from here http://stackoverflow.com/questions/962915/how-do-i-make-an-asynchronous-get-request-in-php */
     function curl_request_async($url, $params, $type='GET')
     {
+        $post_params = array();
         foreach ($params as $key => &$val) {
             if (is_array($val)) $val = implode(',', $val);
             $post_params[] = $key.'='.urlencode($val);
@@ -263,15 +265,26 @@ class SeoTagsProcessor {
 
         $fp = fsockopen($parts['host'],
             isset($parts['port'])?$parts['port']:80,
-            $errno, $errstr, 30);
+            $errno, $errstr, self::$socketTimeout);
+
+        if(!$fp){
+            return;
+        }
+
+        stream_set_timeout($fp, self::$socketTimeout);
 
         // Data goes in the path for a GET request
         if('GET' == $type) $parts['path'] .= '?'.$post_string;
 
         $out = "$type ".$parts['path']." HTTP/1.1\r\n";
+
         $out.= "Host: ".$parts['host']."\r\n";
-        $out.= "Content-Type: application/x-www-form-urlencoded\r\n";
-        $out.= "Content-Length: ".strlen($post_string)."\r\n";
+
+        if('POST' == $type){
+            $out.= "Content-Type: application/x-www-form-urlencoded\r\n";
+            $out.= "Content-Length: ".strlen($post_string)."\r\n";
+        }
+
         $out.= "Connection: Close\r\n\r\n";
         // Data goes in the request body for a POST request
         if ('POST' == $type && isset($post_string)) $out.= $post_string;
@@ -286,16 +299,22 @@ class SeoTagsProcessor {
 
             $this->curl_request_async(self::$serviceUrlEndpoint, array_merge($params, array(
                 'error-code' => $errorType,
-                'scheme' => $_SERVER['REQUEST_SCHEME'],
+                'scheme' => isset($_SERVER['REQUEST_SCHEME']) ? $_SERVER['REQUEST_SCHEME'] : 'http',
                 'host' => $_SERVER['HTTP_HOST'],
                 'port' => $_SERVER['SERVER_PORT'],
-                'page-url' => $_SERVER['REQUEST_URI'],
+                'page-url' => self::getRequestUri(),
+                'uri-hash' => md5(self::getRequestUri()),
                 'request-id' => $this->requestId
             )));
 
         }catch(Exception $e){
             // Just ignore it
         }
+    }
+
+    public static function getRequestUri()
+    {
+        return htmlspecialchars_decode($_SERVER['REQUEST_URI']);
     }
 }
 
@@ -333,8 +352,10 @@ function replaceSeoTags($html){
     return $result;
 }
 
-ob_start('replaceSeoTagsOb');
+if(!defined('DISABLE_SEOTAGS_OUTPUT_BUFFERING')){
+    ob_start('replaceSeoTagsOb');
 
-if(function_exists('register_shutdown_function')){
-    register_shutdown_function('ob_end_flush');
+    if(function_exists('register_shutdown_function')){
+        register_shutdown_function('ob_end_flush');
+    }
 }
