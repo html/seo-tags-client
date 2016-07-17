@@ -25,7 +25,15 @@ processing-finished is sent when processing is finished. Sends processing time i
 
 tagsupdater.php
 ---------------
-Used to save tags from seo-editor to internal database. Returns 'OK' in response if saved properly.
+Used to save tags from seo-editor to internal database. Returns 'OK' in response if saved properly. This is when tags and url POST parameters present.
+
+If $_GET['ping'] present, sends simple notification to server.
+
+If $_GET['show-db-size'] present, shows internal tags database size.
+
+If $_GET['install-client-plugin'], sets cookie for seo-editor panel to be visible.
+
+If $_GET['seo-editor-panel-visible'], gets cookie for seo-editor panel to be visible.
 
 tests.php
 ---------------

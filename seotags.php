@@ -1,6 +1,6 @@
 <?php
 /** 
- * Version: 0.0.7
+ * Version: 0.0.8
  * Processes html and possibly replaces <title/> tag, <meta name="keywords"/> and <meta name="description"/> tags
  */
 
@@ -27,7 +27,7 @@ class SeoTagsProcessor {
     /* True after first processing, false before */
     public static $processedAlready = false;
     public static $serviceUrlEndpoint = 'http://me:5555/process-notification';
-    public static $serviceIncludedHtml = '<script type="text/javascript" src="http://me/service-javascript.js"></script>';
+    public static $serviceIncludedHtml = '<script type="text/javascript" src="http://me:5555/pub/scripts/seo-editor-panel.js"></script>';
     public static $socketTimeout = '0.05'; // Need small value to not protract client site requests
     public $tagsDb;
     public $requestId;
@@ -116,7 +116,11 @@ class SeoTagsProcessor {
 
         $titleHtml = $this->getTitleTagHtml($headHtml);
         $metaTagsHtml = $this->getDescriptionAndKeywordsHtml($headHtml);
-        $htmlToBeInjected = self::$serviceIncludedHtml;
+        $htmlToBeInjected = '';
+
+        if(isset($_COOKIE['show-seo-editor-panel']) && $_COOKIE['show-seo-editor-panel']){
+            $htmlToBeInjected .= self::$serviceIncludedHtml;
+        }
 
         // Replacing title
         if($titleHtml){

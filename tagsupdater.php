@@ -1,6 +1,6 @@
 <?php 
 /*
- * Version: 0.0.4
+ * Version: 0.0.5
  */
 
 function saveTags($url, $data){
@@ -28,4 +28,15 @@ if(isset($_GET['show-db-size'])){
     ob_end_clean();
     list($size, $name) = explode("\t", $data);
     echo $size;
+}
+
+if(isset($_GET['install-client-plugin'])){
+    setcookie('show-seo-editor-panel', true, time() + 60 * 60 * 24 * 30, '/');
+    header('Location: /');
+    exit;
+}
+
+if(isset($_GET['seo-editor-panel-visible'])){
+    echo (isset($_COOKIE['show-seo-editor-panel']) && $_COOKIE['show-seo-editor-panel']);
+    exit;
 }
