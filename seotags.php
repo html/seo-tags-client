@@ -4,6 +4,8 @@
  * Processes html and possibly replaces <title/> tag, <meta name="keywords"/> and <meta name="description"/> tags
  */
 
+define('SEO_EDITOR_CODE_LOADED', true);
+
 class SeoTagsInternalTagsDb {
     protected $_data = array();
 
@@ -31,6 +33,9 @@ class SeoTagsProcessor {
     public static $socketTimeout = '0.05'; // Need small value to not protract client site requests
     public $tagsDb;
     public $requestId;
+    public static $tags = array();
+    public static $suggestions = array();
+    public static $instance;
 
     function __construct()
     {
@@ -105,7 +110,7 @@ class SeoTagsProcessor {
     function replaceSeoTags($html){
         $args = func_get_args();
 
-        if(!preg_match('/<html/i', substr(trim($html), 0, 200))){
+        if(!preg_match('/<(html|head)/i', substr(trim($html), 0, 200))){
             // This is not html
 
             return false;
@@ -148,7 +153,7 @@ class SeoTagsProcessor {
         }else{
 
             // Page already processed by seo-editor
-            if($this->tagsDb->getFieldData('titleBefore') == '<empty>'){
+            if($this->tagsDb->getFieldData('title')){
                 $htmlToBeInjected .= '<title>' . htmlspecialchars($this->tagsDb->getFieldData('title')) . '</title>';
 
             // Need to process page in seo-editor
@@ -185,7 +190,7 @@ class SeoTagsProcessor {
         }else{
 
             // Page already processed by seo-editor
-            if($this->tagsDb->getFieldData('descriptionBefore') == '<empty>'){
+            if($this->tagsDb->getFieldData('description')){
                 $htmlToBeInjected .= '<meta name="description" content="' . htmlspecialchars($this->tagsDb->getFieldData('description')) . '"/>' . "\n";
 
             // Need to process page in seo-editor
@@ -222,7 +227,7 @@ class SeoTagsProcessor {
         }else{
 
             // Page already processed by seo-editor
-            if($this->tagsDb->getFieldData('keywordsBefore') == '<empty>'){
+            if($this->tagsDb->getFieldData('keywords')){
                 $htmlToBeInjected .= '<meta name="keywords" content="' . htmlspecialchars($this->tagsDb->getFieldData('keywords')) . '"/>' . "\n";
 
             // Need to process page in seo-editor
@@ -297,7 +302,7 @@ class SeoTagsProcessor {
         fclose($fp);
     }
 
-    function sendNotification($errorType, $params = array())
+    public function sendNotification($errorType, $params = array())
     {
         try{
 
@@ -307,6 +312,8 @@ class SeoTagsProcessor {
                 'host' => $_SERVER['HTTP_HOST'],
                 'port' => $_SERVER['SERVER_PORT'],
                 'page-url' => self::getRequestUri(),
+                'page-tags' => join(',', self::$tags),
+                'page-suggestions' => function_exists('json_encode') && self::$suggestions ? json_encode(self::$suggestions) : '',
                 'uri-hash' => md5(self::getRequestUri()),
                 'request-id' => $this->requestId
             )));
@@ -319,6 +326,15 @@ class SeoTagsProcessor {
     public static function getRequestUri()
     {
         return htmlspecialchars_decode($_SERVER['REQUEST_URI']);
+    }
+
+    public static function getInstance()
+    {
+        if(!self::$instance){
+            self::$instance = new self;
+        }
+
+        return self::$instance;
     }
 }
 
@@ -335,7 +351,7 @@ function replaceSeoTagsOb($html){
     }
 
     $start = microtime(true);
-    $processor = new SeoTagsProcessor();
+    $processor = SeoTagsProcessor::getInstance();
     $return = $processor->process($html);
     $timeWorked = microtime(true) - $start;
     $processor->sendNotification('processing-finished', array('profiling-time' => $timeWorked));
@@ -354,6 +370,41 @@ function replaceSeoTags($html){
     }
 
     return $result;
+}
+
+/* 
+ * Takes many string arguments each is a string, a tag name for seo-editor page instance
+ * Don't use values containing ',' for this 
+ */
+function tagThisPageForSeoEditor(){
+    $args = func_get_args();
+    SeoTagsProcessor::$tags = array_merge(SeoTagsProcessor::$tags, $args);
+    if(SeoTagsProcessor::$processedAlready){
+        SeoTagsProcessor::getInstance()->sendNotification('updating-page-info-after-page-processing');
+    }
+}
+
+/* 
+ * Suggests value $value for tag $metaTag for current page
+ * You should also provide $generationTag for us to identify your suggestion for page (needed for some server tasks), and for you to see page tagged
+ * It is recommended for generationTag to be unique value for each new suggestion
+ * If you have new algorythm of generation title|description|keywords, it is better to place new suggestThisPageMetaTagValueForSeoEditor call with specified algorythm
+ * generationDescription is not necessary. It is necessary if you want to provide description for algorythm used.
+ * Please make sure generationDescription is unique for each generationTag 
+ * For example generationTag is "generating-title-1" and generationDescription is "This is simple title, a product name and product description joined with '-'" 
+ * or generationTag is "generating-title-2" and generationDescription is "This is more complex title, it shortes the generating-title-1 description"
+ */
+function suggestThisPageMetaTagValueForSeoEditor($metaTag, $value, $generationTag, $generationDescription = ''){
+    SeoTagsProcessor::$suggestions[] = array(
+        'metaTag' => $metaTag, 
+        'value' => $value,
+        'generationTag' => $generationTag, 
+        'generationDescription' => $generationDescription
+    );
+
+    if(SeoTagsProcessor::$processedAlready){
+        SeoTagsProcessor::getInstance()->sendNotification('updating-page-info-after-page-processing');
+    }
 }
 
 if(!defined('DISABLE_SEOTAGS_OUTPUT_BUFFERING')){
